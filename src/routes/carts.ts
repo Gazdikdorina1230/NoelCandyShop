@@ -1,79 +1,135 @@
-import { Router, Request, Response } from "express";
+import { Router } from "express";
+import { collection, doc, getDoc, setDoc, updateDoc, deleteDoc } from "firebase/firestore";
 import { db } from "../firebase";
-import { Timestamp } from "firebase-admin/firestore";
+import authenticateToken from "../middleware/authenticateToken";
 
 const router = Router();
 
-// 🛒 Kosár lekérdezése
-router.get("/:userId", async (req: Request, res: Response) => {
-  const { userId } = req.params;
+// 🔎 Segédfüggvény a kosár dokumentum hivatkozásához
+const getCartDocRef = (userId: string) => doc(collection(db, "carts"), userId);
 
+/**
+ * 🛒 GET /carts/my-cart
+ * Saját kosár lekérése (hitelesítést igényel)
+ */
+router.get("/my-cart", authenticateToken, async (req, res) => {
   try {
-    const cartsRef = db.collection("carts");
-    const cartQuery = await cartsRef.where("userId", "==", userId).get();
+    const userId = req.user?.userId;
+    if (!userId) return res.status(400).json({ message: "Hiányzó felhasználói azonosító." });
 
-    if (cartQuery.empty) {
-      return res.status(404).json({ message: "Kosár nem található." });
+    const cartRef = getCartDocRef(userId);
+    const cartDoc = await getDoc(cartRef);
+
+    if (!cartDoc.exists()) {
+      return res.status(200).json({ items: [] }); // Üres kosár, ha nincs dokumentum
     }
 
-    const cartDoc = cartQuery.docs[0];
-    const cartData = cartDoc.data();
-
-    res.status(200).json({ id: cartDoc.id, ...cartData });
+    res.status(200).json(cartDoc.data());
   } catch (error) {
-    console.error("Hiba a kosár lekérdezésénél:", error);
-    res.status(500).json({ message: "Szerverhiba a kosár lekérdezésekor." });
+    console.error("Hiba a kosár lekérésekor:", error);
+    res.status(500).json({ message: "Hiba a kosár lekérésekor." });
   }
 });
 
-// ➕ Termék hozzáadása a kosárhoz
-router.post("/:userId", async (req: Request, res: Response) => {
-  const { userId } = req.params;
-  const { productId, quantity } = req.body;
-
-  if (!productId || typeof quantity !== "number") {
-    return res.status(400).json({ message: "Hiányzó vagy hibás adatok." });
-  }
-
+/**
+ * ➕ POST /carts/add
+ * Termék hozzáadása a kosárhoz
+ * 🔑 Header: Authorization: Bearer <token>
+ * 📝 Body példa:
+ * {
+ *   "productId": "abc123",
+ *   "quantity": 2
+ * }
+ */
+router.post("/add", authenticateToken, async (req, res) => {
   try {
-    const cartsRef = db.collection("carts");
-    const cartQuery = await cartsRef.where("userId", "==", userId).get();
+    const userId = req.user?.userId;
+    const { productId, quantity } = req.body;
 
-    if (cartQuery.empty) {
-      // Új kosár létrehozása
-      const newCart = {
-        userId,
-        items: [{ productId, quantity }],
-        updatedAt: Timestamp.now(),
-      };
-      const cartDocRef = await cartsRef.add(newCart);
-      return res.status(201).json({ message: "Kosár létrehozva.", id: cartDocRef.id, cart: newCart });
-    } else {
-      // Létező kosár frissítése
-      const cartDoc = cartQuery.docs[0];
-      const cartData = cartDoc.data();
-      const items = cartData.items || [];
-
-      const existingItemIndex = items.findIndex((item: any) => item.productId === productId);
-
-      if (existingItemIndex !== -1) {
-        // Ha a termék már a kosárban van, mennyiség növelése
-        items[existingItemIndex].quantity += quantity;
-      } else {
-        // Új termék hozzáadása a kosárhoz
-        items.push({ productId, quantity });
-      }
-
-      await cartDoc.ref.update({
-        items,
-        updatedAt: Timestamp.now(),
-      });
-
-      return res.status(200).json({ message: "Kosár frissítve.", items });
+    if (!userId || !productId || !quantity) {
+      return res.status(400).json({ message: "Hiányzó mezők (userId, productId, quantity)." });
     }
+
+    const cartRef = getCartDocRef(userId);
+    const cartDoc = await getDoc(cartRef);
+
+    let updatedItems = [];
+
+    if (cartDoc.exists()) {
+      const cartData = cartDoc.data();
+      const existingItem = cartData.items.find((item: any) => item.productId === productId);
+
+      if (existingItem) {
+        // Ha létezik, frissítjük a mennyiséget
+        updatedItems = cartData.items.map((item: any) =>
+          item.productId === productId ? { ...item, quantity: item.quantity + quantity } : item
+        );
+      } else {
+        // Új termék a kosárhoz
+        updatedItems = [...cartData.items, { productId, quantity }];
+      }
+    } else {
+      // Nincs kosár dokumentum, újat hozunk létre
+      updatedItems = [{ productId, quantity }];
+    }
+
+    await setDoc(cartRef, { userId, items: updatedItems, updatedAt: new Date() });
+    res.status(200).json({ message: "Termék sikeresen hozzáadva a kosárhoz." });
   } catch (error) {
-    console.error("Hiba a kosár frissítésekor:", error);
-    res.status(500).json({ message: "Szerverhiba a kosár frissítésekor." });
+    console.error("Hiba a termék hozzáadásakor:", error);
+    res.status(500).json({ message: "Hiba a termék hozzáadásakor." });
+  }
+});
+
+/**
+ * 🗑️ DELETE /carts/remove/:productId
+ * Termék eltávolítása a kosárból
+ */
+router.delete("/remove/:productId", authenticateToken, async (req, res) => {
+  try {
+    const userId = req.user?.userId;
+    const { productId } = req.params;
+
+    if (!userId || !productId) {
+      return res.status(400).json({ message: "Hiányzó felhasználói azonosító vagy termékazonosító." });
+    }
+
+    const cartRef = getCartDocRef(userId);
+    const cartDoc = await getDoc(cartRef);
+
+    if (!cartDoc.exists()) {
+      return res.status(404).json({ message: "Kosár nem található." });
+    }
+
+    const updatedItems = cartDoc.data().items.filter((item: any) => item.productId !== productId);
+    await updateDoc(cartRef, { items: updatedItems, updatedAt: new Date() });
+
+    res.status(200).json({ message: "Termék eltávolítva a kosárból." });
+  } catch (error) {
+    console.error("Hiba a termék eltávolításakor:", error);
+    res.status(500).json({ message: "Hiba a termék eltávolításakor." });
+  }
+});
+
+/**
+ * 🧹 DELETE /carts/clear
+ * Kosár teljes kiürítése
+ */
+router.delete("/clear", authenticateToken, async (req, res) => {
+  try {
+    const userId = req.user?.userId;
+
+    if (!userId) {
+      return res.status(400).json({ message: "Hiányzó felhasználói azonosító." });
+    }
+
+    const cartRef = getCartDocRef(userId);
+    await deleteDoc(cartRef);
+
+    res.status(200).json({ message: "Kosár sikeresen kiürítve." });
+  } catch (error) {
+    console.error("Hiba a kosár törlésekor:", error);
+    res.status(500).json({ message: "Hiba a kosár törlésekor." });
   }
 });
 

@@ -1,26 +1,24 @@
-import { Router, Request, Response } from "express";
+import { Router } from "express";
+import { collection, getDocs } from "firebase/firestore";
 import { db } from "../firebase";
 
 const router = Router();
 
-router.get("/", async (req: Request, res: Response) => {
+// GET /products - Összes termék lekérése
+router.get("/", async (req, res) => {
   try {
-    const productsRef = db.collection("products");
-    const snapshot = await productsRef.get();
-
-    if (snapshot.empty) {
-      return res.status(404).json({ message: "Nincsenek termékek!" });
-    }
+    const productsRef = collection(db, "products"); // ✅ ÚJ szintaxis
+    const snapshot = await getDocs(productsRef); // Dokumentumok lekérése
 
     const products = snapshot.docs.map((doc) => ({
       id: doc.id,
-      ...doc.data(),
+      ...doc.data(), // Dokumentum adatai
     }));
 
-    return res.status(200).json(products);
+    res.status(200).json(products); // JSON válasz a termékekkel
   } catch (error) {
-    console.error("Hiba a termékek lekérdezésekor:", error);
-    return res.status(500).json({ message: "Hiba történt a termékek lekérésekor." });
+    console.error("Hiba a termékek lekérésekor:", error);
+    res.status(500).json({ message: "Hiba a termékek lekérésekor." });
   }
 });
 

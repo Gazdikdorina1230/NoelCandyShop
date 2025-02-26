@@ -1,23 +1,17 @@
-import { db } from "./firebase";
+import { getFirestore, collection, getDocs, QueryDocumentSnapshot } from "firebase/firestore";
+import { db } from "./firebase"; // Saját Firebase inicializációs fájlod
 
-async function testFirestore() {
+const fetchProducts = async () => {
   try {
-    const productsRef = db.collection("products");
-    const snapshot = await productsRef.limit(5).get(); 
+    const productsRef = collection(db, "products");
+    const snapshot = await getDocs(productsRef);
 
-    if (snapshot.empty) {
-      console.log(" Nincsenek termékek a Firestore-ban!");
-      return;
-    }
-
-    snapshot.forEach((doc) => {
-      console.log(`🛍 Termék ID: ${doc.id} ->`, doc.data());
+    snapshot.forEach((doc: QueryDocumentSnapshot) => {
+      console.log(`Termék ID: ${doc.id}`, doc.data());
     });
-
-    console.log(" Firestore kapcsolat működik!");
   } catch (error) {
-    console.error(" Hiba a Firestore kapcsolat tesztelése közben:", error);
+    console.error("Hiba a termékek lekérésekor:", error);
   }
-}
+};
 
-testFirestore();
+fetchProducts();
