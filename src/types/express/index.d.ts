@@ -1,11 +1,9 @@
-import { UserPayload } from "../user";
+import "express";
 
 declare global {
   namespace Express {
     interface Request {
-      user?: UserPayload;
+      user?: { uid: string }; 
     }
   }
 }
-
-export {};

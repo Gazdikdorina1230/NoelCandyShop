@@ -1,24 +1,16 @@
-import { Router } from "express";
-import { collection, getDocs } from "firebase/firestore";
-import { db } from "../firebase";
+import { Router, Request, Response } from "express";
+import admin from "../firebase";
 
 const router = Router();
+const db = admin.firestore();
 
-// GET /products - Összes termék lekérése
-router.get("/", async (req, res) => {
+router.get("/", async (req: Request, res: Response) => {
   try {
-    const productsRef = collection(db, "products"); // ✅ ÚJ szintaxis
-    const snapshot = await getDocs(productsRef); // Dokumentumok lekérése
-
-    const products = snapshot.docs.map((doc) => ({
-      id: doc.id,
-      ...doc.data(), // Dokumentum adatai
-    }));
-
-    res.status(200).json(products); // JSON válasz a termékekkel
+    const snapshot = await db.collection("products").get();
+    const products = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+    res.json(products);
   } catch (error) {
-    console.error("Hiba a termékek lekérésekor:", error);
-    res.status(500).json({ message: "Hiba a termékek lekérésekor." });
+    res.status(500).json({ error: "Failed to fetch products" });
   }
 });
 

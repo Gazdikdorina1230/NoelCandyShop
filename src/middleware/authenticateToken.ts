@@ -1,3 +1,4 @@
+// src/middleware/authenticateToken.ts
 import { Request, Response, NextFunction } from "express";
 import jwt from "jsonwebtoken";
 import { UserPayload } from "../types/user";
@@ -15,8 +16,9 @@ const authenticateToken = (req: Request, res: Response, next: NextFunction) => {
       return res.status(403).json({ message: "Érvénytelen token." });
     }
 
-    // 👇 Itt adjuk hozzá a `user` property-t a `req`-hez
-    req.user = decoded as UserPayload;
+    // Itt adjuk hozzá a `user` property-t a `req`-hez
+    req.user = decoded as UserPayload;  // A `decoded` objektum a payload-ot tartalmazza, amit a JWT küldött
+
     next();
   });
 };

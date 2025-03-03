@@ -1,19 +1,20 @@
 import express from "express";
 import cors from "cors";
-import productsRouter from "./routes/products";
-import "./firebase";
-import authRouter from "./routes/auth";
-import cartsRouter from "./routes/carts";
+import authMiddleware from "./middleware/authMiddleware";
+import productsRoutes from "./routes/products";
+import cartsRoutes from "./routes/carts";
+import ordersRoutes from "./routes/orders";
 
 const app = express();
-const PORT = process.env.PORT || 3000;
 
 app.use(cors());
 app.use(express.json());
-app.use("/auth", authRouter);
-app.use("/products", productsRouter);
-app.use("/carts", cartsRouter);
 
+app.use("/api/products", productsRoutes);
+app.use("/api/carts", authMiddleware, cartsRoutes);
+app.use("/api/orders", authMiddleware, ordersRoutes);
+
+const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
-  console.log(` Szerver fut a http://localhost:${PORT} címen`);
+  console.log(`Server is running on port ${PORT}`);
 });
