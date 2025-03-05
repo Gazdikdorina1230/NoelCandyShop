@@ -1,33 +1,46 @@
 import { Request, Response } from "express";
-import admin from "firebase-admin";
+import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
+import { db } from "../firebase";
 
-const JWT_SECRET = process.env.JWT_SECRET || "your_secret_key";
-
-// 📩 Regisztráció
-export const registerUser = async (req: Request, res: Response) => {
-  const { email, password } = req.body;
-
+export const register = async (req: Request, res: Response) => {
   try {
-    const userRecord = await admin.auth().createUser({ email, password });
-    res.status(201).json({ message: "Sikeres regisztráció!", uid: userRecord.uid });
-  } catch (error: any) {
-    res.status(400).json({ error: error.message });
+    const { email, password, isAdmin = false } = req.body;
+
+    const userRef = db.collection("users").doc(email);
+    const userSnap = await userRef.get();
+    if (userSnap.exists) {
+      return res.status(400).json({ message: "Ez az email már regisztrálva van!" });
+    }
+
+    const hashedPassword = await bcrypt.hash(password, 10);
+    await userRef.set({ email, password: hashedPassword, isAdmin });
+
+    res.status(201).json({ message: "Sikeres regisztráció!" });
+  } catch (error) {
+    res.status(500).json({ message: "Hiba történt a regisztráció során." });
   }
 };
 
-// 🔑 Bejelentkezés
-export const loginUser = async (req: Request, res: Response) => {
-  const { email, password } = req.body;
-
+export const login = async (req: Request, res: Response) => {
   try {
-    const user = await admin.auth().getUserByEmail(email);
+    const { email, password } = req.body;
 
-    // 🔑 JWT token generálás
-    const token = jwt.sign({ uid: user.uid, email: user.email }, JWT_SECRET, { expiresIn: "1h" });
+    const userRef = db.collection("users").doc(email);
+    const userSnap = await userRef.get();
+    if (!userSnap.exists) {
+      return res.status(400).json({ message: "Hibás email vagy jelszó!" });
+    }
 
-    res.status(200).json({ message: "Sikeres bejelentkezés!", token });
-  } catch (error: any) {
-    res.status(400).json({ error: "Érvénytelen email vagy jelszó." });
+    const userData = userSnap.data();
+    const passwordMatch = await bcrypt.compare(password, userData!.password);
+    if (!passwordMatch) {
+      return res.status(400).json({ message: "Hibás email vagy jelszó!" });
+    }
+
+    const token = jwt.sign({ id: email, isAdmin: userData!.isAdmin }, "secret", { expiresIn: "1h" });
+    res.json({ token });
+  } catch (error) {
+    res.status(500).json({ message: "Hiba történt a bejelentkezés során." });
   }
 };

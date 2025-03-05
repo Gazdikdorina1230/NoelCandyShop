@@ -1,17 +1,18 @@
 import express from "express";
-import dotenv from "dotenv";
-
-dotenv.config();
+import cors from "cors";
+import authRoutes from "./routes/auth";
+import productRoutes from "./routes/products";
+import orderRoutes from "./routes/orders";
+import cartRoutes from "./routes/carts";
 
 const app = express();
-const PORT = process.env.PORT || 3000;
 
+app.use(cors());
 app.use(express.json());
 
-app.get("/", (req, res) => {
-  res.send(" Szerver működik!");
-});
+app.use("/api/auth", authRoutes);
+app.use("/api/products", productRoutes);
+app.use("/api/orders", orderRoutes);
+app.use("/api/carts", cartRoutes);
 
-app.listen(PORT, () => {
-  console.log(` Szerver fut a http://localhost:${PORT} címen`);
-});
+export default app;
