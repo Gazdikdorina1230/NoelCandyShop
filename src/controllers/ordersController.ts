@@ -1,42 +1,50 @@
 import { Request, Response } from "express";
-import admin from "../firebase"; // Firebase kapcsolat
+import admin from "../firebase";
 
-// Rendelés létrehozása
 export const createOrder = async (req: Request, res: Response) => {
-  const { userId, items, totalAmount } = req.body;
+  const { items } = req.body;
+  const userId = req.user?.uid;
+
+  if (!items || !userId) {
+    return res.status(400).json({ error: "Items and user ID are required" });
+  }
 
   try {
-    const newOrderRef = admin.firestore().collection("orders").doc();
-    const order = {
+    const orderRef = await admin.firestore().collection("orders").add({
       userId,
       items,
-      totalAmount,
-      status: "pending",
       createdAt: admin.firestore.FieldValue.serverTimestamp(),
-      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-    };
+    });
 
-    await newOrderRef.set(order);
-    return res.status(201).json({ message: "Order created", orderId: newOrderRef.id });
+    return res.status(201).json({ id: orderRef.id });
   } catch (error) {
-    console.error("Error creating order:", error);
-    return res.status(500).json({ error: "Error creating order" });
+    return res.status(500).json({ error: "Failed to create order" });
   }
 };
 
-// Rendelések lekérése
 export const getOrders = async (req: Request, res: Response) => {
+  const userId = req.user?.uid;
+
+  if (!userId) {
+    return res.status(400).json({ error: "User ID is required" });
+  }
+
   try {
-    const ordersSnapshot = await admin.firestore().collection("orders").get();
-    const orders = ordersSnapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+    const ordersSnapshot = await admin.firestore().collection("orders")
+      .where("userId", "==", userId)
+      .get();
+
+    const orders = ordersSnapshot.docs.map((doc) => ({
+      id: doc.id,
+      ...doc.data(),
+    }));
+
     return res.status(200).json(orders);
   } catch (error) {
-    console.error("Error getting orders:", error);
-    return res.status(500).json({ error: "Error getting orders" });
+    return res.status(500).json({ error: "Failed to fetch orders" });
   }
 };
 
-// Rendelés státuszának frissítése
 export const updateOrderStatus = async (req: Request, res: Response) => {
   const { orderId } = req.params;
   const { status } = req.body;
@@ -62,7 +70,6 @@ export const updateOrderStatus = async (req: Request, res: Response) => {
 
     return res.status(200).json({ message: `Order status updated to ${status}` });
   } catch (error) {
-    console.error("Error updating order status:", error);
     return res.status(500).json({ error: "Error updating order status" });
   }
 };

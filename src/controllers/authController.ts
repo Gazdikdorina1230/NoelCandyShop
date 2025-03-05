@@ -23,7 +23,6 @@ export const loginUser = async (req: Request, res: Response) => {
   try {
     const user = await admin.auth().getUserByEmail(email);
 
-    // 🔑 JWT token generálás
     const token = jwt.sign({ uid: user.uid, email: user.email }, JWT_SECRET, { expiresIn: "1h" });
 
     res.status(200).json({ message: "Sikeres bejelentkezés!", token });

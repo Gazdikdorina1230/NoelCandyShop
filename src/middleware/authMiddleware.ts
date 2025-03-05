@@ -1,20 +1,63 @@
-import { Request, Response, NextFunction } from "express";
+import { Request, Response } from "express";
 import admin from "../firebase";
 
-const authMiddleware = async (req: Request, res: Response, next: NextFunction) => {
-  const token = req.headers.authorization?.split(" ")[1];
+export const createOrder = async (req: Request, res: Response) => {
+  const { items } = req.body;
+  const userId = req.user?.uid;
 
-  if (!token) {
-    return res.status(401).json({ error: "Unauthorized" });
+  if (!items || !userId) {
+    return res.status(400).json({ error: "Items and user ID are required" });
   }
 
   try {
-    const decodedToken = await admin.auth().verifyIdToken(token);
-    req.user = { uid: decodedToken.uid };  // Hozzáadjuk a `user` mezőt a Request objektumhoz
-    next();
+    const orderRef = await admin.firestore().collection("orders").add({
+      userId,
+      items,
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+
+    return res.status(201).json({ id: orderRef.id });
   } catch (error) {
-    return res.status(401).json({ error: "Invalid token" });
+    return res.status(500).json({ error: "Failed to create order" });
   }
 };
 
-export default authMiddleware;
+export const getOrders = async (req: Request, res: Response) => {
+  const userId = req.user?.uid;
+
+  if (!userId) {
+    return res.status(400).json({ error: "User ID is required" });
+  }
+
+  try {
+    const ordersSnapshot = await admin.firestore().collection("orders")
+      .where("userId", "==", userId)
+      .get();
+
+    const orders = ordersSnapshot.docs.map((doc) => ({
+      id: doc.id,
+      ...doc.data(),
+    }));
+
+    return res.status(200).json(orders);
+  } catch (error) {
+    return res.status(500).json({ error: "Failed to fetch orders" });
+  }
+};
+
+export const updateOrderStatus = async (req: Request, res: Response) => {
+  const { orderId } = req.params;
+  const { status } = req.body;
+
+  const validStatuses = ["pending", "completed", "cancelled"];
+
+  if (!validStatuses.includes(status)) {
+    return res.status(400).json({ error: "Invalid status" });
+  }
+
+  try {
+    const orderRef = admin.firestore().collection("orders").doc(orderId);
+    const orderDoc = await orderRef.get();
+
+    if (!orderDoc.exists) {
+      return

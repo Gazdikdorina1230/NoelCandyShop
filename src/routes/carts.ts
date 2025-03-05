@@ -4,10 +4,7 @@ import authMiddleware from "../middleware/authMiddleware";
 
 const router = Router();
 
-// Kosár lekérése (authMiddleware biztosítja, hogy a felhasználó be legyen jelentkezve)
-router.get("/", authMiddleware, getCart);
-
-// Kosár frissítése (termékek hozzáadása)
-router.put("/", authMiddleware, updateCart);
+router.get("/", authMiddleware, getCart); // Kosár lekérése (védett)
+router.post("/", authMiddleware, updateCart); // Kosár frissítése (védett)
 
 export default router;

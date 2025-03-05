@@ -7,12 +7,13 @@ import ordersRoutes from "./routes/orders";
 
 const app = express();
 
-app.use(cors());
-app.use(express.json());
+app.use(cors()); // Engedélyezett kereszt-domain kérések
+app.use(express.json()); // JSON formátumú adatok kezelése
 
-app.use("/api/products", productsRoutes);
-app.use("/api/carts", authMiddleware, cartsRoutes);
-app.use("/api/orders", authMiddleware, ordersRoutes);
+// Átjárók a különböző útvonalakhoz
+app.use("/api/products", productsRoutes); // Termékek
+app.use("/api/carts", authMiddleware, cartsRoutes); // Kosár (védett)
+app.use("/api/orders", authMiddleware, ordersRoutes); // Rendelések (védett)
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {

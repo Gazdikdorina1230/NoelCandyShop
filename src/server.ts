@@ -1,17 +1,21 @@
 import express from "express";
 import dotenv from "dotenv";
+import productsRoutes from "./routes/products";
+import cartsRoutes from "./routes/carts";
+import ordersRoutes from "./routes/orders";
+import authMiddleware from "./middleware/authMiddleware";
 
 dotenv.config();
 
 const app = express();
-const PORT = process.env.PORT || 3000;
 
 app.use(express.json());
 
-app.get("/", (req, res) => {
-  res.send(" Szerver működik!");
-});
+app.use("/api/products", productsRoutes);
+app.use("/api/carts", authMiddleware, cartsRoutes);
+app.use("/api/orders", authMiddleware, ordersRoutes);
 
+const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
-  console.log(` Szerver fut a http://localhost:${PORT} címen`);
+  console.log(`Server is running on port ${PORT}`);
 });

@@ -1,16 +1,11 @@
 import { Router } from "express";
-import { createOrder, getOrders, updateOrderStatus } from "../controllers/ordersController"; // Biztosítva, hogy a createOrder is importálva van
-import authMiddleware from "../middleware/authMiddleware"; // Az auth middleware is importálva
+import { createOrder, getOrders, updateOrderStatus } from "../controllers/ordersController";
+import authMiddleware from "../middleware/authMiddleware";
 
 const router = Router();
 
-// Rendelés létrehozása (POST)
-router.post("/", authMiddleware, createOrder);
-
-// Rendelések lekérése (GET)
-router.get("/", authMiddleware, getOrders);
-
-// Rendelés státuszának frissítése (PUT)
-router.put("/:orderId/status", authMiddleware, updateOrderStatus);
+router.post("/", authMiddleware, createOrder); // Rendelés létrehozása (védett)
+router.get("/", authMiddleware, getOrders); // Rendelések lekérése (védett)
+router.put("/:orderId/status", authMiddleware, updateOrderStatus); // Rendelés státuszának frissítése
 
 export default router;

@@ -1,12 +1,11 @@
 import { Request, Response } from "express";
 import admin from "../firebase";
 
-// Kosár lekérése a felhasználó ID alapján
 export const getCart = async (req: Request, res: Response) => {
   const userId = req.user?.uid;
-  
+
   if (!userId) {
-    return res.status(400).json({ error: "User not authenticated" });
+    return res.status(401).json({ error: "User not authenticated" });
   }
 
   try {
@@ -17,30 +16,28 @@ export const getCart = async (req: Request, res: Response) => {
       return res.status(404).json({ error: "Cart not found" });
     }
 
-    const cartData = cartSnapshot.data();
-    return res.status(200).json(cartData);
+    return res.status(200).json(cartSnapshot.data());
   } catch (error) {
     console.error("Error getting cart:", error);
     return res.status(500).json({ error: "Error fetching cart" });
   }
 };
 
-// Kosár frissítése (termék hozzáadása a kosárhoz)
 export const updateCart = async (req: Request, res: Response) => {
   const userId = req.user?.uid;
-  const { items } = req.body; // Kosár elemek (termékek és mennyiség)
+  const { items } = req.body;
 
   if (!userId) {
-    return res.status(400).json({ error: "User not authenticated" });
+    return res.status(401).json({ error: "User not authenticated" });
   }
 
-  if (!items || items.length === 0) {
-    return res.status(400).json({ error: "Items are required" });
+  if (!items || !Array.isArray(items)) {
+    return res.status(400).json({ error: "Invalid cart items format" });
   }
 
   try {
     const cartRef = admin.firestore().collection("carts").doc(userId);
-    await cartRef.set({ items }, { merge: true }); // A kosár adatokat frissítjük vagy létrehozzuk
+    await cartRef.set({ items, updatedAt: admin.firestore.FieldValue.serverTimestamp() }, { merge: true });
 
     return res.status(200).json({ message: "Cart updated successfully" });
   } catch (error) {
